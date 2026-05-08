@@ -47,6 +47,18 @@ if (showGlobe) {
   viewer.scene.globe.show = false;
 }
 
+viewer.camera.changed.addEventListener(() => {
+  const cartographic = viewer.camera.positionCartographic;
+  const longitudeDeg = Cesium.Math.toDegrees(cartographic.longitude);
+
+  // Offset UTC so solar noon aligns with the viewed longitude
+  const solarOffsetHours = longitudeDeg / 15;
+  const now = new Date();
+  now.setUTCHours(now.getUTCHours() + solarOffsetHours);
+
+  viewer.clock.currentTime = Cesium.JulianDate.fromDate(now);
+});
+
 async function loadLayer(name) {
   const tileset = await Cesium3DTileset.fromUrl(`/${name}`);
   tileset.cacheBytes = 1024 * (1 << 20);
