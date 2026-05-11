@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 
+[features]
+default = ["embedded-viewer"]
+embedded-viewer = []
+
 [dependencies]
 anyhow = "1.0.102"
 async-recursion = "1.1.1"

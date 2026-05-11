@@ -27,6 +27,8 @@ pub mod middleware;
 pub mod s2_utils;
 pub mod tiles3d;
 pub mod utils;
+
+#[cfg(feature = "embedded-viewer")]
 pub mod viewer;
 
 #[tokio::main]
@@ -96,9 +98,12 @@ async fn main() -> Result<()> {
     let app = Router::new()
         .merge(compat_routes)
         .merge(short_cache_routes)
-        .merge(long_cache_routes)
-        .fallback(viewer::static_handler)
-        .with_state(app_state.clone());
+        .merge(long_cache_routes);
+
+    #[cfg(feature = "embedded-viewer")]
+    let app = app.fallback(viewer::static_handler);
+
+    let app = app.with_state(app_state.clone());
 
     let app = match config.cors_origin.as_deref() {
         None => app,

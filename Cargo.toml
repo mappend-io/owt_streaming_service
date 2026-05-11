@@ -18,4 +18,3 @@ transforms = { path = "transforms" }
 
 [profile.release]
 strip = true
-#debug = true
