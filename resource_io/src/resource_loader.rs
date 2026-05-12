@@ -387,9 +387,11 @@ impl ResourceLoader {
                 let mut entries = tokio::fs::read_dir(path).await?;
                 let mut items = vec![];
                 while let Some(entry) = entries.next_entry().await? {
-                    let path = entry.path();
-                    if let Some(file_name) = path.file_name() {
-                        items.push(file_name.to_string_lossy().to_string());
+                    if entry.file_type().await?.is_file() {
+                        let path = entry.path();
+                        if let Some(file_name) = path.file_name() {
+                            items.push(file_name.to_string_lossy().to_string());
+                        }
                     }
                 }
                 Ok(items)
@@ -402,7 +404,7 @@ impl ResourceLoader {
                     .s3_client
                     .list_objects_v2()
                     .bucket(bucket)
-                    .prefix(prefix)
+                    .prefix(&prefix)
                     .send()
                     .await
                     .map_err(|e| Error::S3(e.to_string()))?;
@@ -410,9 +412,13 @@ impl ResourceLoader {
                 let mut items = vec![];
                 for obj in res.contents() {
                     if let Some(key) = obj.key() {
-                        let stem = key.split('/').next_back().unwrap_or("");
-                        if !stem.is_empty() {
-                            items.push(stem.to_string());
+                        // Strip the prefix, it better be there
+                        let Some(relative) = key.strip_prefix(&prefix) else {
+                            continue;
+                        };
+                        // Only keep non-empty keys without a slash
+                        if !relative.contains('/') && !relative.is_empty() {
+                            items.push(relative.to_string());
                         }
                     }
                 }
