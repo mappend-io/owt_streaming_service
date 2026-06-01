@@ -3,8 +3,8 @@ use clap::Parser;
 use humantime::parse_duration;
 
 #[derive(Clone, Debug, Parser)]
-#[command(name = "comingle")]
-#[command(about = "Comingle 3D Tiles datasets")]
+#[command(name = "owt_streaming_service")]
+#[command(about = "Stream 3D Tiles datasets")]
 pub struct Config {
     /// Log level
     #[arg(long, env = "RUST_LOG", default_value = concat!(env!("CARGO_PKG_NAME"), "=info"))]

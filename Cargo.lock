@@ -913,45 +913,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 
 [[package]]
-name = "comingle"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-recursion",
- "async-trait",
- "axum",
- "blake3",
- "bytes",
- "bytesize",
- "clap",
- "dotenvy",
- "futures",
- "geojson",
- "glam",
- "gltf_arc",
- "gltf_io",
- "gltf_types",
- "humantime",
- "iref",
- "iri-string",
- "mime_guess",
- "moka",
- "regex",
- "resource_io",
- "rust-embed",
- "s2",
- "serde",
- "serde_json",
- "terrarium",
- "thiserror 2.0.18",
- "tokio",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "transforms",
-]
-
-[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2415,6 +2376,45 @@ name = "outref"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
+
+[[package]]
+name = "owt_streaming_service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-recursion",
+ "async-trait",
+ "axum",
+ "blake3",
+ "bytes",
+ "bytesize",
+ "clap",
+ "dotenvy",
+ "futures",
+ "geojson",
+ "glam",
+ "gltf_arc",
+ "gltf_io",
+ "gltf_types",
+ "humantime",
+ "iref",
+ "iri-string",
+ "mime_guess",
+ "moka",
+ "regex",
+ "resource_io",
+ "rust-embed",
+ "s2",
+ "serde",
+ "serde_json",
+ "terrarium",
+ "thiserror 2.0.18",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "transforms",
+]
 
 [[package]]
 name = "p256"

@@ -1,15 +1,15 @@
-# Comingle
+# OWT Streaming Service (OSS)
 
-Comingle is a 3D Tiles 1.1 tile server that exposes virtual tilesets backed by
-S3 or local filesystem content, organized via S2 cell tokens. The source
-tilesets may be stored in 3TZ archives. Comingle serves tilesets over HTTP for
-use with CesiumJS, Cesium for Unreal, Cesium for Unity, and other 3D Tiles
-consumers, and includes a bundled CesiumJS viewer for quick inspection.
+OSS is a 3D Tiles 1.1 tile server that exposes virtual tilesets backed by S3 or
+local filesystem content, organized via S2 cell tokens. The source tilesets may
+be stored in 3TZ archives. OSS serves tilesets over HTTP for use with
+CesiumJS, Cesium for Unreal, Cesium for Unity, and other 3D Tiles consumers,
+and includes a bundled CesiumJS viewer for quick inspection.
 
 ## Quick start
 
 - Create [layer definitions](#Layer-definitions), one per file, at `/path/to/layers`
-- Run `comingle --layer-config-uri file:///path/to/layers/`
+- Run `owt_streaming_service --layer-config-uri file:///path/to/layers/`
 - Open `http://localhost:3200/?layers=my-layer,my-other-layer` to use the [bundled viewer](#Bundled-viewer)
 - OR point CesiumJS, Cesium Native or other 3D Tiles consumers to `http://localhost:3200/my-layer`
 - Open `http://localhost:3200/layers` to discover layers and endpoints
@@ -17,11 +17,11 @@ consumers, and includes a bundled CesiumJS viewer for quick inspection.
 ## Command line reference
 
 ```text
-Usage: comingle [OPTIONS] --layer-config-uri <LAYER_CONFIG_URI>
+Usage: owt_streaming_service [OPTIONS] --layer-config-uri <LAYER_CONFIG_URI>
 
 Options:
       --log-level <LOG_LEVEL>
-          Log level [env: RUST_LOG=] [default: comingle=info]
+          Log level [env: RUST_LOG=] [default: owt_streaming_service=info]
       --pretty-log
           Use pretty logging instead of JSON [env: PRETTY_LOG=true]
       --listen-addr <LISTEN_ADDR>
@@ -80,7 +80,7 @@ Note that while options may be provided several ways, the precedence is
 
 ## Bundled CesiumJS viewer
 
-Comingle includes a bundled CesiumJS environment. Pass query parameters in the
+OSS includes a bundled CesiumJS environment. Pass query parameters in the
 URL to load one or more layers:
 
 ```text
@@ -97,7 +97,7 @@ http://localhost:3200/?layers=my-layer,my-other-layer&noglobe
 
 ## Use with CesiumJS, Cesium Native and other 3D Tiles tooling
 
-Comingle exposes standard 3D Tiles 1.1 tilesets over HTTP. To use with CesiumJS,
+OSS exposes standard 3D Tiles 1.1 tilesets over HTTP. To use with CesiumJS,
 for example:
 
 ```js
@@ -123,8 +123,8 @@ in Web Mercator projection (EPSG:3857).
 
 ## Bundled MaplibreGL JS viewer for Mapzen Terrarium tiles
 
-Comingle includes a bundled MaplibreGL environment. Elevation data may be
-previewed using the URL format:
+OSS includes a bundled MaplibreGL environment. Elevation data may be previewed
+using the URL format:
 
 ```text
 http://localhost:3200/terrarium_viewer/my-layer
@@ -136,7 +136,7 @@ Layer definitions must use identifier-friendly names (i.e. only alphanumeric,
 `-` and `_` symbols are allowed). Place layer definitions in a directory (or S3
 bucket), one definition per file.
 
-The layer definition describes how the virtual layer exposed by Comingle should
+The layer definition describes how the virtual layer exposed by OSS should
 locate source content. To accomplish this, several key elements are necessary:
 
 - `sourceUriContentTemplate`: An `s3:` or `file:` URI pointing to backing source
@@ -155,7 +155,7 @@ locate source content. To accomplish this, several key elements are necessary:
   Use `["1", "3", "5", "7", "9", "b"]` to represent the entire globe.
 - `baseGlobeTerrainUri`: Optional, only use for terrain layers. This provides
   backfill for lower S2 levels for navigation.
-- `rootGeometricError`: Comingle does not touch source data until a viewer
+- `rootGeometricError`: OSS does not touch source data until a viewer
   requests it. This hint helps populate the virtual tileset ancestors above the
   content.
 - `tilesetExtensionsRequired`: Set to `["MAXAR_content_geojson"]` if exposing a
@@ -230,7 +230,7 @@ my-other-layer.json
 
 ## Changing layer definitions
 
-Layer definitions are loaded on-demand. They are cached in memory by Comingle
+Layer definitions are loaded on-demand. They are cached in memory by OSS
 for `--layer-definition-ttl` (5m by default). Changing an existing layer
 definition means the change will not necessarily get picked up right away if it
 has recently be used. This helps reduce the load on the config storage layer and

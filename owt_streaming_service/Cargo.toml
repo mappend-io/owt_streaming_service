@@ -1,5 +1,5 @@
 [package]
-name = "comingle"
+name = "owt_streaming_service"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

@@ -9,10 +9,10 @@ RUN curl -fsSL https://bun.sh/install | bash
 
 WORKDIR /app
 COPY . .
-RUN cargo build --release --target x86_64-unknown-linux-musl -p comingle
+RUN cargo build --release --target x86_64-unknown-linux-musl -p owt_streaming_service
 
 FROM scratch
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/comingle /usr/bin/comingle
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/owt_streaming_service /usr/bin/owt_streaming_service
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 EXPOSE 3200
-CMD ["/usr/bin/comingle"]
+CMD ["/usr/bin/owt_streaming_service"]
