@@ -38,9 +38,9 @@ pub struct LayerDefinition {
     #[serde(default)]
     pub content_transforms: BTreeSet<String>,
 
-    // Like: `dtm/{FACE}/{LEVEL}/{COL}/{ROW}.png`
-    #[serde(default)]
-    pub elevation_png_content: Option<String>,
+    // Like: `dtm/{FACE}/{LEVEL}/{COL}/{ROW}.tif`
+    #[serde(default, alias = "elevation_png_content")]
+    pub elevation_raster_content: Option<String>,
 }
 
 impl LayerDefinition {

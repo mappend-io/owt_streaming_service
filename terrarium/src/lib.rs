@@ -20,7 +20,7 @@ pub struct ElevationRasterS2 {
     pub resolution_s: f64,
     pub resolution_t: f64, // Always negative
     pub pixel_dims: glam::IVec2,
-    pub data: Vec<glam::U8Vec3>, // RGB encoded
+    pub data: Vec<f32>,
 }
 
 pub struct ElevationRasterMapzen {
@@ -75,7 +75,82 @@ pub fn resolve_elevation_raster_uri_tokens(
         .replace("{ROW}", &row.to_string())
 }
 
-pub async fn read_content_raster_s2(
+pub async fn read_content_raster_s2_from_lerc_zstd_tif(
+    resource_loader: resource_io::ResourceLoader,
+    raster_template_uri: &str,
+    s2_package_level: i32,
+    token: s2::cellid::CellID,
+) -> Result<ElevationRasterS2> {
+    use iri_string::types::UriAbsoluteStr;
+
+    let package_token = token.parent(s2_package_level as u64);
+
+    let (face, level, col, row) = face_level_col_row_from_cell_id(token);
+
+    tracing::trace!("Loading token: {}", token.to_token());
+
+    let tif_resolved_uri = resolve_elevation_raster_uri_tokens(
+        raster_template_uri,
+        &package_token,
+        face,
+        level,
+        col,
+        row,
+    );
+    let tif_uri = UriAbsoluteStr::new(&tif_resolved_uri)?;
+    let tif_bytes = resource_loader
+        .read_async(tif_uri)
+        .await
+        .with_context(|| format!("Could not read {tif_uri}"))?;
+
+    let sidecar_uri = format!("{tif_resolved_uri}.aux.xml");
+    let sidecar_uri_abs = UriAbsoluteStr::new(&sidecar_uri)?;
+    let sidecar_bytes = resource_loader
+        .read_async(sidecar_uri_abs)
+        .await
+        .with_context(|| format!("Could not read {sidecar_uri_abs}"))?;
+
+    // Make a string from the aux xml sidecar
+    let sidecar_str = std::str::from_utf8(&sidecar_bytes)
+        .with_context(|| format!("TIF sidecar at {sidecar_uri} is not valid UTF-8"))?;
+    let gt = parse_pam_geotransform(sidecar_str)
+        .with_context(|| format!("Could not parse tif sidecar at {sidecar_uri}"))?;
+
+    let reader = tiff_reader::TiffFile::from_bytes(tif_bytes.to_vec())
+        .with_context(|| format!("Could not open TIFF at {tif_uri}"))?;
+
+    let ifd = reader
+        .ifd(0)
+        .with_context(|| format!("Could not get tif reader ifd with {tif_uri}"))?;
+
+    let width = ifd.width();
+    let height = ifd.height();
+
+    spawn_blocking(move || {
+        let (data, _offset) = reader
+            .read_image(0)
+            .with_context(|| format!("Could not decode tif"))?
+            .into_raw_vec_and_offset();
+
+        let pixel_level_f = -(gt.pixel_width.log2());
+        let pixel_level = pixel_level_f.round() as i32;
+
+        Ok(ElevationRasterS2 {
+            face,
+            pixel_level,
+            origin_s: gt.origin_x,
+            origin_t: gt.origin_y,
+            resolution_s: gt.pixel_width,
+            resolution_t: gt.pixel_height,
+            pixel_dims: glam::ivec2(width as i32, height as i32),
+            data,
+        })
+    })
+    .await
+    .context("Join error")?
+}
+
+pub async fn read_content_raster_s2_from_terrarium_rgb_png(
     resource_loader: resource_io::ResourceLoader,
     raster_template_uri: &str,
     s2_package_level: i32,
@@ -165,9 +240,13 @@ pub async fn read_content_raster_s2(
             );
         }
 
-        // Reinterpret the flat RGB byte buffer as Vec<U8Vec3>. U8Vec3 is #[repr(C)]
-        // with three u8 fields, so the layout matches RGBRGBRGB exactly.
-        let data: Vec<glam::U8Vec3> = bytemuck::cast_slice::<u8, glam::U8Vec3>(raw).to_vec();
+        // Decode the flat RGB byte buffer from mapzfen rgb to f32
+        let data: Vec<f32> = raw
+            .chunks_exact(3)
+            .map(|rgb| {
+                utils::decode_elevation_from_mapzen_rgb(glam::u8vec3(rgb[0], rgb[1], rgb[2]))
+            })
+            .collect();
 
         let pixel_level_f = -(gt.pixel_width.log2());
         let pixel_level = pixel_level_f.round() as i32;
@@ -293,13 +372,25 @@ pub async fn build_terrarium_rgb_tile(
     // to optimize cache locality
 
     // For each content S2 package, read the S2 raster token files
+    use futures::future::FutureExt;
     let s2_rasters: Vec<_> = join_all(s2_raster_tokens.iter().map(|token| {
-        read_content_raster_s2(
-            resource_loader.clone(),
-            raster_template_uri,
-            s2_content_package_level,
-            *token,
-        )
+        if raster_template_uri.ends_with(".png") {
+            read_content_raster_s2_from_terrarium_rgb_png(
+                resource_loader.clone(),
+                raster_template_uri,
+                s2_content_package_level,
+                *token,
+            )
+            .boxed()
+        } else {
+            read_content_raster_s2_from_lerc_zstd_tif(
+                resource_loader.clone(),
+                raster_template_uri,
+                s2_content_package_level,
+                *token,
+            )
+            .boxed()
+        }
     }))
     .await
     .into_iter()

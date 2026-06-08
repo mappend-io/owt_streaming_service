@@ -75,8 +75,6 @@ fn interpolate_cubic(v0: f32, v1: f32, v2: f32, v3: f32, f: f32) -> f32 {
     a * f3 + b * f2 + c * f + d
 }
 
-// TODO: When we loda the source rgb, turn it into f32, so we don't keep decoding
-// over and over
 pub fn sample_bicubic(source: &ElevationRasterS2, x: f64, y: f64) -> glam::U8Vec3 {
     let w = source.pixel_dims.x as i32;
     let h = source.pixel_dims.y as i32;
@@ -90,7 +88,7 @@ pub fn sample_bicubic(source: &ElevationRasterS2, x: f64, y: f64) -> glam::U8Vec
     let get_elev = |px: i32, py: i32| -> f32 {
         let clamped_x = px.clamp(0, w - 1) as usize;
         let clamped_y = py.clamp(0, h - 1) as usize;
-        decode_elevation_from_mapzen_rgb(source.data[clamped_y * w as usize + clamped_x])
+        source.data[clamped_y * w as usize + clamped_x]
     };
 
     // Bicubic needs a 4x4 grid, interpolate each of the 4 rows horizontally first

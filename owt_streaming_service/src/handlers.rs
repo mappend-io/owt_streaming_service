@@ -388,7 +388,7 @@ pub async fn get_terrarium_tile(
         .await
         .map_err(|_| StatusCode::NOT_FOUND)?;
 
-    if layer_def.elevation_png_content.is_none() {
+    if layer_def.elevation_raster_content.is_none() {
         return Err(StatusCode::NOT_FOUND);
     }
 
@@ -397,7 +397,7 @@ pub async fn get_terrarium_tile(
         // then strip the path in any case to get the root "dir".
         "{}/{}",
         layer_def.source_uri_content_template,
-        layer_def.elevation_png_content.clone().unwrap()
+        layer_def.elevation_raster_content.clone().unwrap()
     );
 
     let index = terrarium::MapzenTileIndex {

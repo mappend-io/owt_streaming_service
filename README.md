@@ -110,7 +110,7 @@ async function loadLayer(id) {
 
 ## Mapzen Terrarium endpoint
 
-If `elevationPngContent` is provided in a layer, a Mapzen Terrarium endpoint
+If `elevationRasterContent` is provided in a layer, a Mapzen Terrarium endpoint
 will be exposed at:
 
 ```text
@@ -155,19 +155,18 @@ locate source content. To accomplish this, several key elements are necessary:
   Use `["1", "3", "5", "7", "9", "b"]` to represent the entire globe.
 - `baseGlobeTerrainUri`: Optional, only use for terrain layers. This provides
   backfill for lower S2 levels for navigation.
-- `rootGeometricError`: OSS does not touch source data until a viewer
-  requests it. This hint helps populate the virtual tileset ancestors above the
-  content.
+- `rootGeometricError`: OSS does not touch source data until a viewer requests
+  it. This hint helps populate the virtual tileset ancestors above the content.
 - `tilesetExtensionsRequired`: Set to `["MAXAR_content_geojson"]` if exposing a
   vector dataset, otherwise leave it as an empty array
 - `description`: An optional string to include in the layer list.
 - `assetId`: For emulation, a numeric ID for this asset. Be sure to use a unique
   value for each layer.
 - `contentTransforms`: A list of content transformations to apply
-- `elevationPngContent`: Path to elevation RGB PNGs within the content, if
-  present. If defined, a Mapzen Terrarium endpoint will be exposed. The tokens
-  `{FACE}`, `{LEVEL}`, `{COL}` and `{ROW}` will be substituted. Example:
-  `dtm/{FACE}/{LEVEL}/{COL}/{ROW}.png`.
+- `elevationRasterContent`: Path to Mapzen Terrarium-encoded RGB PNG or F32 TIFF
+  rasters within the content, if present. If defined, a Mapzen Terrarium
+  endpoint will be exposed. The tokens `{FACE}`, `{LEVEL}`, `{COL}` and `{ROW}`
+  will be substituted. Example: `dtm/{FACE}/{LEVEL}/{COL}/{ROW}.tif`.
 
 The remaining fields can be set as described in the sample below and are
 reserved for future use.
@@ -184,7 +183,7 @@ A sample layer definition:
     "sourceS2ContentExtension": "glb",
     "sourceS2ContentCoverageTokens": ["1", "3", "5", "7", "9", "b"],
     "baseGlobeTerrainUri": "s3://bucket/prefix/base_globe/terrain.3tz",
-    "elevationPngContent": "dtm/{FACE}/{LEVEL}/{COL}/{ROW}.png",
+    "elevationRasterContent": "dtm/{FACE}/{LEVEL}/{COL}/{ROW}.tif",
     "rootGeometricError": 131072,
     "tilesetRootProperty": {},
     "tilesetExtensionsUsed": [],
