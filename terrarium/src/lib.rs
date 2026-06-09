@@ -11,6 +11,28 @@ pub use utils::*;
 mod geo;
 mod utils;
 mod warp;
+mod warp_imagery;
+
+pub struct ImageryRasterS2 {
+    pub face: u8,
+    pub pixel_level: i32,
+    pub origin_s: f64,
+    pub origin_t: f64,
+    pub resolution_s: f64,
+    pub resolution_t: f64, // Always negative
+    pub pixel_dims: glam::IVec2,
+    pub data: Vec<glam::U8Vec3>,
+}
+
+pub struct ImageryRasterWmtsSimple {
+    pub tile_index: MapzenTileIndex,
+    pub origin_x: f64,     // TODO: Clarify what this means, exactly
+    pub origin_y: f64,     // TODO: Clarify what this means, exactly
+    pub resolution_x: f64, // TODO: Clarify what this means, exactly
+    pub resolution_y: f64, // Always positive
+    pub pixel_dims: glam::IVec2,
+    pub data: Vec<glam::U8Vec3>, // RGB encoded
+}
 
 pub struct ElevationRasterS2 {
     pub face: u8,
@@ -419,4 +441,217 @@ pub async fn build_terrarium_rgb_tile(
         Ok(encode_mapzen_elevation_tile_png(&output_raster))
     })
     .await?
+}
+
+// Always 256x256
+pub fn make_wmts_simple_imagery_raster_for_tile(
+    index: &MapzenTileIndex,
+) -> ImageryRasterWmtsSimple {
+    const TILE_SIZE: i32 = 256;
+
+    // Geotransform in tile-grid coordinates at this zoom.
+    // Origin is the NW corner of the tile (top-left pixel's top-left corner,
+    // GDAL convention). Pixel resolution is 1 tile / 256 pixels = 1/256.
+    // Both resolutions positive because we treat +y as southward, matching
+    // the tile-grid convention.
+    let origin_x = index.col as f64;
+    let origin_y = index.row as f64;
+    let resolution_x = 1.0 / TILE_SIZE as f64;
+    let resolution_y = 1.0 / TILE_SIZE as f64;
+
+    ImageryRasterWmtsSimple {
+        tile_index: *index,
+        origin_x,
+        origin_y,
+        resolution_x,
+        resolution_y,
+        pixel_dims: glam::ivec2(TILE_SIZE, TILE_SIZE),
+        // TODO: Maybe want to make this an MSL/geoid-relative value
+        data: vec![glam::u8vec3(0, 0, 0); (TILE_SIZE * TILE_SIZE) as usize],
+    }
+}
+
+pub fn make_empty_wmts_simple_imagery_tile(index: &MapzenTileIndex) -> Bytes {
+    let r = make_wmts_simple_imagery_raster_for_tile(index);
+    encode_wmts_simple_imagery_to_jpg(&r)
+}
+
+pub async fn build_simple_wmts_imagery_tile(
+    resource_loader: resource_io::ResourceLoader,
+    raster_template_uri: &str, // Path to rasters, we replace {CONTENT_ROOT_TOKEN}, {FACE}, {LEVEL}, {COL}, {ROW}
+    s2_content_package_level: i32,
+    index: &MapzenTileIndex,
+) -> Result<Bytes> {
+    tracing::trace!("Index {index:?}");
+
+    // Build GD envelope
+    let gd_coverage = mapzen_tile_to_wgs84_envelope(index);
+    tracing::trace!("Coverage {gd_coverage:?}");
+
+    // Find corresponding S2 raster level
+    let s2_raster_level = mapzen_zoom_to_s2_level(index.zoom)
+        .with_context(|| format!("Could not map zoom level {} to S2 level", index.zoom))?;
+    tracing::trace!(
+        "Mapzen level {} maps to s2 raster level {}",
+        index.zoom,
+        s2_raster_level
+    );
+
+    if s2_raster_level < s2_content_package_level {
+        // Maybe just make an HAE=0 version and return it?
+        bail!("TODO: Need to pull from coarse raster for this");
+    }
+
+    // Find S2 coverage at S2 raster level
+    let s2_raster_tokens = gd_rect_to_s2_coverage(&gd_coverage, s2_raster_level);
+    tracing::trace!(
+        "Found these s2 tokens at level {}: {:?}",
+        s2_raster_level,
+        s2_raster_tokens
+    );
+
+    // FUTURE OPTIMIZATION: Sort S2 raster tokens by S2 content token bins, just
+    // to optimize cache locality
+
+    // For each content S2 package, read the S2 raster token files
+    let s2_rasters: Vec<_> = join_all(s2_raster_tokens.iter().map(|token| {
+        read_content_raster_s2_from_jpg(
+            resource_loader.clone(),
+            raster_template_uri,
+            s2_content_package_level,
+            *token,
+        )
+    }))
+    .await
+    .into_iter()
+    .filter_map(|r| match r {
+        Ok(raster) => Some(raster),
+        Err(_) => {
+            // It's ok that these fail sometimes, we might not have entire world coverage of input data
+            //tracing::warn!(?e, "Failed to read s2 raster tile, skipping");
+            None
+        }
+    })
+    .collect();
+
+    // Make output image, our warp target
+    let index = index.clone();
+    spawn_blocking(move || {
+        let mut output_raster = make_wmts_simple_imagery_raster_for_tile(&index);
+        output_raster.data.fill(glam::u8vec3(0, 0, 0));
+
+        // Perform warp
+        for s2_raster in &s2_rasters {
+            warp_imagery::apply_imagery_warp_from_source(&mut output_raster, s2_raster);
+        }
+
+        // Encode image to PNG
+        Ok(encode_wmts_simple_imagery_to_jpg(&output_raster))
+    })
+    .await?
+}
+
+pub fn encode_wmts_simple_imagery_to_jpg(raster: &ImageryRasterWmtsSimple) -> Bytes {
+    let width = raster.pixel_dims.x as u32;
+    let height = raster.pixel_dims.y as u32;
+
+    debug_assert_eq!(
+        raster.data.len(),
+        (width * height) as usize,
+        "Raster data length does not match pixel_dims"
+    );
+
+    // Reinterpret Vec<U8Vec3> to &[u8]
+    let pixel_bytes: &[u8] = bytemuck::cast_slice(&raster.data);
+
+    let mut buf = BytesMut::new().writer();
+
+    // Scoped to make the encoder flush before freeze
+    {
+        use jpeg_encoder::{ColorType, Encoder};
+
+        //let mut buf = Vec::new();
+        let encoder = Encoder::new(&mut buf, 85); // quality 85
+        encoder
+            .encode(&pixel_bytes, width as u16, height as u16, ColorType::Rgb)
+            .expect("JPG encoder should never fail");
+    }
+
+    buf.into_inner().freeze()
+}
+
+pub async fn read_content_raster_s2_from_jpg(
+    resource_loader: resource_io::ResourceLoader,
+    raster_template_uri: &str,
+    s2_package_level: i32,
+    token: s2::cellid::CellID,
+) -> Result<ImageryRasterS2> {
+    use iri_string::types::UriAbsoluteStr;
+
+    let package_token = token.parent(s2_package_level as u64);
+
+    let (face, level, col, row) = face_level_col_row_from_cell_id(token);
+
+    tracing::trace!("Loading token: {}", token.to_token());
+
+    let jpg_resolved_uri = resolve_elevation_raster_uri_tokens(
+        raster_template_uri,
+        &package_token,
+        face,
+        level,
+        col,
+        row,
+    );
+    let jpg_uri = UriAbsoluteStr::new(&jpg_resolved_uri)?;
+    let jpg_bytes = resource_loader
+        .read_async(jpg_uri)
+        .await
+        .with_context(|| format!("Could not read {jpg_uri}"))?;
+
+    let sidecar_uri = format!("{jpg_resolved_uri}.aux.xml");
+    let sidecar_uri_abs = UriAbsoluteStr::new(&sidecar_uri)?;
+    let sidecar_bytes = resource_loader
+        .read_async(sidecar_uri_abs)
+        .await
+        .with_context(|| format!("Could not read {sidecar_uri_abs}"))?;
+
+    // Make a string from the aux xml sidecar
+    let sidecar_str = std::str::from_utf8(&sidecar_bytes)
+        .with_context(|| format!("TIF sidecar at {sidecar_uri} is not valid UTF-8"))?;
+    let gt = parse_pam_geotransform(sidecar_str)
+        .with_context(|| format!("Could not parse tif sidecar at {sidecar_uri}"))?;
+
+    // Decode the jpg, no copy
+    use zune_core::bytestream::ZCursor;
+    use zune_jpeg::JpegDecoder;
+    let cursor = ZCursor::new(&jpg_bytes);
+    let mut decoder = JpegDecoder::new(cursor);
+    let pixels = decoder.decode()?;
+    let info = decoder.info().unwrap();
+
+    let width = info.width;
+    let height = info.height;
+
+    spawn_blocking(move || {
+        let data: Vec<_> = pixels
+            .chunks_exact(3)
+            .map(|rgb| glam::u8vec3(rgb[0], rgb[1], rgb[2]))
+            .collect();
+
+        let pixel_level_f = -(gt.pixel_width.log2());
+        let pixel_level = pixel_level_f.round() as i32;
+
+        Ok(ImageryRasterS2 {
+            face,
+            pixel_level,
+            origin_s: gt.origin_x,
+            origin_t: gt.origin_y,
+            resolution_s: gt.pixel_width,
+            resolution_t: gt.pixel_height,
+            pixel_dims: glam::ivec2(width as i32, height as i32),
+            data,
+        })
+    })
+    .await
+    .context("Join error")?
 }

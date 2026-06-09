@@ -41,6 +41,10 @@ pub struct LayerDefinition {
     // Like: `dtm/{FACE}/{LEVEL}/{COL}/{ROW}.tif`
     #[serde(default, alias = "elevationPngContent")]
     pub elevation_raster_content: Option<String>,
+
+    // Like: `imagery/{FACE}/{LEVEL}/{COL}/{ROW}.jpg`
+    #[serde(default)]
+    pub imagery_raster_content: Option<String>,
 }
 
 impl LayerDefinition {

@@ -97,6 +97,7 @@ async fn main() -> Result<()> {
             get(get_base_globe_terrain_payload),
         )
         .route("/terrarium/{id}/{zoom}/{x}/{y}", get(get_terrarium_tile))
+        .route("/wmts/{id}/{zoom}/{x}/{y}", get(get_wmts_simple_imagery))
         .route_layer(from_fn(cache_forever));
 
     let app = Router::new()

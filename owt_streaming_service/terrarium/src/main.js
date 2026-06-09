@@ -4,6 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 const id = window.location.pathname.split("/").filter(Boolean)[1];
 const TILE_URL = `/terrarium/${id}/{z}/{x}/{y}.png`;
+const IMAGERY_URL = `/wmts/${id}/{z}/{x}/{y}.jpg`;
 
 const map = new maplibregl.Map({
   container: "map",
@@ -18,6 +19,12 @@ const map = new maplibregl.Map({
       //   attribution: "&copy; OpenStreetMap Contributors",
       //   maxzoom: 19,
       // },
+      imagery: {
+        type: "raster",
+        tiles: [IMAGERY_URL],
+        tileSize: 256,
+        maxzoom: 16,
+      },
       hillshadeDem: {
         type: "raster-dem",
         tiles: [TILE_URL],
@@ -35,21 +42,23 @@ const map = new maplibregl.Map({
     },
     layers: [
       // When OSM is disabled, we need some background fill
+      /*
       {
         id: "background",
         type: "background",
         paint: { "background-color": "#e8dcc8" },
       },
-      // {
-      //   id: "osm",
-      //   type: "raster",
-      //   source: "osm",
-      // },
+      */
+      {
+        id: "imagery",
+        type: "raster",
+        source: "imagery",
+      },
       {
         id: "hillshade",
         type: "hillshade",
         source: "hillshadeDem",
-        paint: { "hillshade-shadow-color": "#473B24" },
+        paint: { "hillshade-shadow-color": "#444444" },
       },
     ],
   },

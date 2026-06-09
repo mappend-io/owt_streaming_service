@@ -12,6 +12,7 @@ bytes = "1.11.1"
 futures = "0.3.32"
 glam = { version = "0.32.1", features = ["bytemuck"] }
 iri-string = "0.7.12"
+jpeg-encoder = "0.7.0"
 png = "0.18.1"
 regex = "1.12.3"
 resource_io = { workspace = true }
@@ -19,3 +20,5 @@ s2 = "0.0.13"
 tiff-reader = "0.6.0"
 tokio = { version = "1.52.1", features = ["rt", "macros"] }
 tracing = "0.1.44"
+zune-core = "0.5.1"
+zune-jpeg = "0.5.15"
