@@ -17,9 +17,9 @@ pub async fn index_handler() -> impl IntoResponse {
 pub async fn asset_handler(Path(path): Path<String>) -> impl IntoResponse {
     serve_file(
         &format!("assets/{path}"),
-        &mime_guess::from_path(&path)
+        mime_guess::from_path(&path)
             .first_or_octet_stream()
-            .to_string(),
+            .as_ref(),
     )
 }
 

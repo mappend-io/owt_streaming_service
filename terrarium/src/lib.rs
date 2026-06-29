@@ -1,7 +1,6 @@
 use anyhow::{Context, Result, bail};
 use bytes::{BufMut, Bytes, BytesMut};
 use futures::future::join_all;
-use png;
 use tokio::task::spawn_blocking;
 use warp::*;
 
@@ -151,7 +150,7 @@ pub async fn read_content_raster_s2_from_lerc_zstd_tif(
     spawn_blocking(move || {
         let (data, _offset) = reader
             .read_image(0)
-            .with_context(|| format!("Could not decode tif"))?
+            .context("Could not decode tif")?
             .into_raw_vec_and_offset();
 
         let pixel_level_f = -(gt.pixel_width.log2());
@@ -248,7 +247,7 @@ pub async fn read_content_raster_s2_from_terrarium_rgb_png(
         ];
         let frame_info = reader
             .next_frame(&mut raw)
-            .with_context(|| format!("Could not decode PNG frame"))?;
+            .context("Could not decode PNG frame")?;
 
         // next_frame may report a smaller used length than the buffer (e.g. if the
         // image is interlaced or the buffer was over-allocated); trim to it.
@@ -416,18 +415,12 @@ pub async fn build_terrarium_rgb_tile(
     }))
     .await
     .into_iter()
-    .filter_map(|r| match r {
-        Ok(raster) => Some(raster),
-        Err(_) => {
-            // It's ok that these fail sometimes, we might not have entire world coverage of input data
-            //tracing::warn!(?e, "Failed to read s2 raster tile, skipping");
-            None
-        }
-    })
+    // It's ok that these fail sometimes, we might not have entire world coverage of input data
+    .filter_map(|r| r.ok())
     .collect();
 
     // Make output image, our warp target
-    let index = index.clone();
+    let index = *index;
     spawn_blocking(move || {
         let mut output_raster = make_mapzen_elevation_raster_for_tile(&index);
         output_raster.data.fill(encode_elevation_to_mapzen_rgb(0.0));
@@ -524,18 +517,12 @@ pub async fn build_simple_wmts_imagery_tile(
     }))
     .await
     .into_iter()
-    .filter_map(|r| match r {
-        Ok(raster) => Some(raster),
-        Err(_) => {
-            // It's ok that these fail sometimes, we might not have entire world coverage of input data
-            //tracing::warn!(?e, "Failed to read s2 raster tile, skipping");
-            None
-        }
-    })
+    // It's ok that these fail sometimes, we might not have entire world coverage of input data
+    .filter_map(|r| r.ok())
     .collect();
 
     // Make output image, our warp target
-    let index = index.clone();
+    let index = *index;
     spawn_blocking(move || {
         let mut output_raster = make_wmts_simple_imagery_raster_for_tile(&index);
         output_raster.data.fill(glam::u8vec3(0, 0, 0));
@@ -573,7 +560,7 @@ pub fn encode_wmts_simple_imagery_to_jpg(raster: &ImageryRasterWmtsSimple) -> By
         //let mut buf = Vec::new();
         let encoder = Encoder::new(&mut buf, 85); // quality 85
         encoder
-            .encode(&pixel_bytes, width as u16, height as u16, ColorType::Rgb)
+            .encode(pixel_bytes, width as u16, height as u16, ColorType::Rgb)
             .expect("JPG encoder should never fail");
     }
 

@@ -76,8 +76,8 @@ fn interpolate_cubic(v0: f32, v1: f32, v2: f32, v3: f32, f: f32) -> f32 {
 }
 
 pub fn sample_bicubic(source: &ElevationRasterS2, x: f64, y: f64) -> glam::U8Vec3 {
-    let w = source.pixel_dims.x as i32;
-    let h = source.pixel_dims.y as i32;
+    let w = source.pixel_dims.x;
+    let h = source.pixel_dims.y;
 
     let x_int = x.floor() as i32;
     let y_int = y.floor() as i32;
@@ -93,9 +93,9 @@ pub fn sample_bicubic(source: &ElevationRasterS2, x: f64, y: f64) -> glam::U8Vec
 
     // Bicubic needs a 4x4 grid, interpolate each of the 4 rows horizontally first
     let mut col_results = [0.0f32; 4];
-    for i in 0..4 {
+    for (i, row_result) in col_results.iter_mut().enumerate() {
         let py = y_int - 1 + i as i32;
-        col_results[i] = interpolate_cubic(
+        *row_result = interpolate_cubic(
             get_elev(x_int - 1, py),
             get_elev(x_int, py),
             get_elev(x_int + 1, py),

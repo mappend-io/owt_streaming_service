@@ -222,7 +222,7 @@ pub async fn get_content_payload(
             GeoJson::Geometry(_) => todo!(),
         };
 
-        let mut instance_count = 0_u64;
+        let _instance_count = 0_u64;
 
         for feature in &features {
             if let Some(Geometry {
