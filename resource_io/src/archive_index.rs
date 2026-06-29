@@ -197,6 +197,13 @@ impl ArchiveIndex {
         let data_start = local_header_offset + 30 + lfh_n + lfh_m;
         let raw_bytes = reader.read_range_async(data_start, data_size).await?;
 
-        Ok(ArchiveIndex::from_raw_bytes(&raw_bytes))
+        tokio::task::spawn_blocking(move || Ok(ArchiveIndex::from_raw_bytes(&raw_bytes)))
+            .await
+            .map_err(|e| {
+                Error::Io(std::io::Error::other(format!(
+                    "spawn_blocking failed: {}",
+                    e
+                )))
+            })?
     }
 }

@@ -86,13 +86,18 @@ impl RangeReader for CachingRangeReader {
             let block = self.fetch_block_async(start_block).await?;
             let block_offset = (offset % self.block_size) as usize;
 
-            // Don't reach out of bounds if the file ended early
-            // TODO: Have an IncompleteRead if block.len() != requested len
             let available_bytes = block.len().saturating_sub(block_offset);
             let actual_length = std::cmp::min(length as usize, available_bytes);
 
-            // Return a zero-copy slice of the cached block
             return Ok(block.slice(block_offset..(block_offset + actual_length)));
+        }
+
+        // If this is a large read (arbitrarily defined here), don't try to cache
+        // it at all. Just read directly. Huge objects pollute the cache, and are
+        // generally something read a single time (a huge archive index, maybe).
+        if end_block - start_block > 16 {
+            counter!("caching_range_reader_large_reads").increment(1);
+            return self.reader.read_range_async(offset, length).await;
         }
 
         let mut result = BytesMut::with_capacity(length as usize);
@@ -102,10 +107,8 @@ impl RangeReader for CachingRangeReader {
         let fetch_futures =
             (start_block..=end_block).map(|block_idx| self.fetch_block_async(block_idx));
 
-        // Fetch all blocks concurrently
         let blocks = try_join_all(fetch_futures).await?;
 
-        // The blocks are sequentially ordered, smash them into the result
         for block in blocks {
             let block_offset = (current_offset % self.block_size) as usize;
 
@@ -113,8 +116,7 @@ impl RangeReader for CachingRangeReader {
             let bytes_to_take = std::cmp::min(remaining_length as usize, available_bytes);
 
             if bytes_to_take == 0 {
-                // TODO: Have an IncompleteRead if block.len() != requested len
-                break; // We reached EOF before fulfilling the full length requested
+                break;
             }
 
             result.extend_from_slice(&block[block_offset..(block_offset + bytes_to_take)]);

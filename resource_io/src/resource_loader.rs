@@ -233,20 +233,34 @@ impl ResourceLoader {
                     compressed_data
                 }
                 8 => {
-                    // Deflate
-                    use std::io::Read;
-                    let mut decoder = flate2::read::DeflateDecoder::new(&compressed_data[..]);
-                    let mut out = Vec::with_capacity(uncompressed_size);
-                    decoder
-                        .read_to_end(&mut out)
-                        .map_err(|e| Error::Decompression(e.to_string()))?;
-                    Bytes::from(out)
+                    // Deflate (offloaded to blocking pool to avoid blocking the Tokio runtime)
+                    let compressed_data = compressed_data.clone();
+                    tokio::task::spawn_blocking(move || {
+                        use std::io::Read;
+                        let mut decoder = flate2::read::DeflateDecoder::new(&compressed_data[..]);
+                        let mut out = Vec::with_capacity(uncompressed_size);
+                        decoder
+                            .read_to_end(&mut out)
+                            .map_err(|e| Error::Decompression(e.to_string()))?;
+                        Ok::<Bytes, Error>(Bytes::from(out))
+                    })
+                    .await
+                    .map_err(|e| {
+                        Error::Decompression(format!("Tokio spawn_blocking failed: {}", e))
+                    })??
                 }
                 93 => {
-                    // Zstandard
-                    let out = zstd::stream::decode_all(&compressed_data[..])
-                        .map_err(|e| Error::Decompression(e.to_string()))?;
-                    Bytes::from(out)
+                    // Zstandard (offloaded to blocking pool)
+                    let compressed_data = compressed_data.clone();
+                    tokio::task::spawn_blocking(move || {
+                        let out = zstd::stream::decode_all(&compressed_data[..])
+                            .map_err(|e| Error::Decompression(e.to_string()))?;
+                        Ok::<Bytes, Error>(Bytes::from(out))
+                    })
+                    .await
+                    .map_err(|e| {
+                        Error::Decompression(format!("Tokio spawn_blocking failed: {}", e))
+                    })??
                 }
                 _ => {
                     return Err(Error::BadArchive(format!(

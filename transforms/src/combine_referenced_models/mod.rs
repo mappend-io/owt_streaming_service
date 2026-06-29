@@ -6,11 +6,13 @@ use itertools::Itertools;
 use resource_io::ResourceLoader;
 use std::collections::BTreeMap;
 
+#[derive(Clone)]
 pub struct ReferencedModelInstance {
     pub model_to_world: glam::DMat4,
     // FUTURE: Add schema, property values
 }
 
+#[derive(Clone)]
 pub struct ReferencedModel {
     pub model_uri: UriAbsoluteString,
     pub instances: Vec<ReferencedModelInstance>,
@@ -112,18 +114,25 @@ pub async fn combine_referenced_models(
         rewrite_uris_for_combining(doc, content_root_uri, content_geojson_uri, uri)?;
     }
 
-    // Convert from gltf_types to gltf_arc for combining
-    let arc_models = models
-        .into_iter()
-        .map(|(uri, doc)| {
-            let converted = gltf_arc::Document::try_from(&doc)
-                .with_context(|| format!("Failed to convert document: {uri}"))?;
-            Ok((uri, converted))
-        })
-        .collect::<Result<BTreeMap<_, _>>>()?;
+    // Convert from gltf_types to gltf_arc for combining and combine them
+    // (offloaded to blocking pool to avoid blocking Tokio runtime on large inputs)
+    let references = referenced_models.to_vec();
+    let doc = tokio::task::spawn_blocking(move || {
+        let arc_models = models
+            .into_iter()
+            .map(|(uri, doc)| {
+                let converted = gltf_arc::Document::try_from(&doc)
+                    .with_context(|| format!("Failed to convert document: {uri}"))?;
+                Ok((uri, converted))
+            })
+            .collect::<Result<BTreeMap<_, _>>>()?;
 
-    // TODO: spawn_blocking?
-    combine_many_glbs(arc_models, referenced_models, combined_model_matrix)
+        combine_many_glbs(arc_models, &references, combined_model_matrix)
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!("spawn_blocking failed: {}", e))??;
+
+    Ok(doc)
 }
 
 // Fetch all of the unique model URIs in parallel (ordered for cache coherency)

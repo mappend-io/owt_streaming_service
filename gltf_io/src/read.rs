@@ -19,9 +19,13 @@ pub async fn read_model(
         bytes.clone()
     };
 
-    // Deserialize the json structure
-    let mut model = serde_json::from_slice::<gltf_types::Document>(&json_bytes)
-        .context("Could not deserialize model")?;
+    // Deserialize the json structure (offloaded to blocking pool)
+    let mut model = tokio::task::spawn_blocking(move || {
+        serde_json::from_slice::<gltf_types::Document>(&json_bytes)
+            .context("Could not deserialize model")
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!("spawn_blocking failed: {}", e))??;
 
     // GLBs are unique: if the first buffer doesn't have a URI, it pulls from the BIN glb chunk
     if let Some(glb_chunks) = &glb_chunks

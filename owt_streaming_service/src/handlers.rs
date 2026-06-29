@@ -211,7 +211,9 @@ pub async fn get_content_payload(
             .read_async(uri)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        let geojson = GeoJson::from_reader(&geojson_bytes[..])
+        let geojson = tokio::task::spawn_blocking(move || GeoJson::from_reader(&geojson_bytes[..]))
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
         let features = match geojson {
@@ -299,8 +301,9 @@ pub async fn get_content_payload(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        let mut raw_doc = doc
-            .to_gltf_types()
+        let mut raw_doc = tokio::task::spawn_blocking(move || doc.to_gltf_types())
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         raw_doc.0.buffers[0].data = raw_doc.1;
 
@@ -315,7 +318,9 @@ pub async fn get_content_payload(
             }
         }
 
-        bytes = gltf_io::write::create_glb(&raw_doc.0)
+        bytes = tokio::task::spawn_blocking(move || gltf_io::write::create_glb(&raw_doc.0))
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
         counter!("transform_inline_owt_referenced_models_tiles_total").increment(1);
