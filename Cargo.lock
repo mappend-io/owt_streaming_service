@@ -2636,49 +2636,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
-name = "owt_streaming_service"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-recursion",
- "async-trait",
- "axum",
- "axum-prometheus",
- "axum-server",
- "blake3",
- "bytes",
- "bytesize",
- "clap",
- "dotenvy",
- "futures",
- "geojson",
- "glam",
- "gltf_arc",
- "gltf_io",
- "gltf_types",
- "humantime",
- "iref",
- "iri-string",
- "metrics",
- "metrics-exporter-prometheus",
- "mime_guess",
- "moka",
- "regex",
- "resource_io",
- "rust-embed",
- "s2",
- "serde",
- "serde_json",
- "terrarium",
- "thiserror 2.0.18",
- "tokio",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "transforms",
-]
-
-[[package]]
 name = "p256"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2793,6 +2750,49 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a106d1259c23fac8e543272398ae0e3c0b8d33c88ed73d0cc71b0f1d902618"
 dependencies = [
  "portable-atomic",
+]
+
+[[package]]
+name = "porter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-recursion",
+ "async-trait",
+ "axum",
+ "axum-prometheus",
+ "axum-server",
+ "blake3",
+ "bytes",
+ "bytesize",
+ "clap",
+ "dotenvy",
+ "futures",
+ "geojson",
+ "glam",
+ "gltf_arc",
+ "gltf_io",
+ "gltf_types",
+ "humantime",
+ "iref",
+ "iri-string",
+ "metrics",
+ "metrics-exporter-prometheus",
+ "mime_guess",
+ "moka",
+ "regex",
+ "resource_io",
+ "rust-embed",
+ "s2",
+ "serde",
+ "serde_json",
+ "terrarium",
+ "thiserror 2.0.18",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "transforms",
 ]
 
 [[package]]

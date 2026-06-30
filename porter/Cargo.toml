@@ -1,5 +1,5 @@
 [package]
-name = "owt_streaming_service"
+name = "porter"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

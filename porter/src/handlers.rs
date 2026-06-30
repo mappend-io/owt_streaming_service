@@ -262,6 +262,9 @@ pub async fn get_content_payload(
                         0.0,
                     );
 
+                    // TODO: I'm not handling reuse well, I'm making a separate
+                    // unique instance even if it's shared. This will burn us
+                    // for trees, etc.
                     referenced_models.push(ReferencedModel {
                         model_uri: norm_ref
                             .parse()

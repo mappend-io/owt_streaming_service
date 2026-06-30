@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["owt_streaming_service", "gltf_io", "gltf_arc", "gltf_types", "resource_io", "transforms", "terrarium"]
+members = ["porter", "gltf_io", "gltf_arc", "gltf_types", "resource_io", "transforms", "terrarium"]
 
 [workspace.package]
 version = "0.1.0"
